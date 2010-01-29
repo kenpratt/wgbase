@@ -24,6 +24,10 @@ ifdef HIPE
   ERLC_FLAGS += +native +"{hipe, [o3]}"
 endif
 
+ifdef USE_LOG4ERL
+  ERLC_FLAGS += -DUSE_LOG4ERL
+endif
+
 BASE_DIR := ..
 EBIN_DIR := ../ebin
 DOC_DIR  = ../edoc
