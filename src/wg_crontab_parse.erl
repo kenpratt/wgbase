@@ -94,7 +94,7 @@ parse_field(F, Min, Max) when F >= Min, F =< Max ->
 parse_field(F = [_|_], Min, Max) when is_list(F) ->
     case string:tokens(F, ",") of
         [Single] -> % is range
-            case parse_range(Single) of
+            case parse_range(Single, Min, Max) of
                 {First, Last, _Step} = Range when First >= Min, Last =< Max ->
                     {?CRON_RANGE, Range}
             end;
@@ -107,8 +107,8 @@ parse_field(F = [_|_], Min, Max) when is_list(F) ->
     end.
      
 
-%% parse the range string: "2-5/2", "2-5"
-parse_range(Str) ->
+%% parse the range string: "*/2", "2-5/2", "2-5"
+parse_range(Str, Min, Max) ->
     {RangeStr, Step} = 
     case string:tokens(Str, "/") of
         [Range] ->
@@ -116,5 +116,11 @@ parse_range(Str) ->
         [Range, StepStr] ->
             {Range, list_to_integer(StepStr)}
     end,
-    [First, Last] = string:tokens(RangeStr, "-"),
-    {list_to_integer(First), list_to_integer(Last), Step}.
+    [First, Last] =
+    case RangeStr of
+        "*" ->
+            [Min, Max];
+        _ ->
+            [list_to_integer(S) || S <- string:tokens(RangeStr, "-")]
+    end,
+    {First, Last, Step}.
