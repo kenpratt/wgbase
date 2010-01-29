@@ -13,7 +13,7 @@
 -include("wg.hrl").
 -include("wg_crontab.hrl").
 
--export([start_link/0]).
+-export([start_link/0, start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
                             terminate/2, code_change/3]).
 
@@ -26,7 +26,7 @@
         cron_timer :: reference()       % the check cron task timer
     }).
 
--define(CRON_FILE, "./etc/crontab.cfg").
+-define(DEFAULT_CRON_FILE, "./etc/crontab.cfg").
 -define(CHECK_FILE_INTERVAL, 60000). % 1 min
 -define(CHECK_CRON_INTERVAL, 60000). % 1 min
 -define(SERVER, ?MODULE).
@@ -35,17 +35,22 @@
 -spec start_link() ->
     {'ok', pid()} | 'ignore' | {'error', any()}.
 start_link() ->
+    start_link(?DEFAULT_CRON_FILE).
+
+-spec start_link(CronFile :: string()) ->
+    {'ok', pid()} | 'ignore' | {'error', any()}.
+start_link(CronFile) ->
     ?DEBUG2("~p start_link", [?SERVER]),
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [CronFile], []).
 
 %% gen_server callbacks
-init(_Args) ->
+init([CronFile]) ->
     process_flag(trap_exit, true),
-    case wg_crontab_parse:parse(?CRON_FILE) of
+    case wg_crontab_parse:parse(CronFile) of
         {ok, Entrys} ->
             State = #state{
-                file = ?CRON_FILE,
-                mtime = filelib:last_modified(?CRON_FILE),
+                file = CronFile,
+                mtime = filelib:last_modified(CronFile),
                 entrys = Entrys,
                 file_timer = check_file_timer(),
                 cron_timer = check_cron_timer()
