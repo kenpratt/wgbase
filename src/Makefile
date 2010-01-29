@@ -43,7 +43,8 @@ ALL_FILES = $(ERL_OBJECTS) $(addprefix $(EBIN_DIR)/, $(APP_FILES))
 
 $(EBIN_DIR)/%.app: %.app.tpl
 	@echo "creating .app file... "
-	@sed -e 's:@MODULES@:$(ERL_MODULES_IN_APP):g' -e "s:\`:\':g" -e 's/,]/]/g' $< > $@
+	@sed -e 's:@APP_VSN@:$(APP_VSN):g' \
+		-e 's:@MODULES@:$(ERL_MODULES_IN_APP):g' -e "s:\`:\':g" -e 's/,]/]/g' $< > $@
 
 $(EBIN_DIR)/%.$(EMULATOR): %.erl
 	$(ERLC) $(ERLC_FLAGS) -o $(EBIN_DIR) $<
@@ -58,4 +59,4 @@ test: all
 	$(ERL) -noshell -pa ../ebin -s eunit test '.' -s init stop
 
 clean:
-	(rm -rf ./*.beam; rm -f *.app; rm -f *ctl)
+	(rm -rf ./*.beam; rm -f *.app;)
