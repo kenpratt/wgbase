@@ -103,7 +103,6 @@ parse_value(Str, Min, Max) when is_list(Str) ->
 
 %% parse a num string: "15"
 parse_num(Str, Min, Max) ->
-    io:format("parse num: ~p~n", [{Str, Min, Max}]),
     case list_to_integer(Str) of
         N when N >= Min, N =< Max ->
             {?CRON_NUM, N};
