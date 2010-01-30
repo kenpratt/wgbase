@@ -72,44 +72,48 @@ parse_entry(_) ->
 %% parset the fileld
 parse_field(F, Min, Max, Error) ->
     try parse_field(F, Min, Max) of
-        {?CRON_ANY} ->
-            #cron_field{type = ?CRON_RANGE, value = {Min, Max, 1}};
-        {?CRON_NUM, N} ->
-            #cron_field{type = ?CRON_NUM, value = N};
-        {?CRON_RANGE, {_First, _Last, _Step} = Range} ->
-            #cron_field{type = ?CRON_RANGE, value = Range};
-        {?CRON_LIST, List} ->
-            #cron_field{type = ?CRON_LIST, value = List};
-        _ ->
-            throw(Error)
+        Raw ->
+            raw_to_record(Raw, Min, Max, Error)
     catch _:_ ->
         throw(Error)
     end.
 
-
-parse_field("*", _Min, _Max) ->
-    {?CRON_ANY};
-parse_field(F, Min, Max) when F >= Min, F =< Max ->
-    {?CRON_NUM, F};
-parse_field(F = [_|_], Min, Max) when is_list(F) ->
+parse_field(F, Min, Max) when is_list(F) ->
     case string:tokens(F, ",") of
-        [Single] -> % is range
-            case parse_range(Single, Min, Max) of
-                {First, Last, _Step} = Range when First >= Min, Last =< Max ->
-                    {?CRON_RANGE, Range}
-            end;
-        [_|_] = Multi -> % is list
-            lists:map(
-                fun(E) ->
-                        parse_field(E, Min, Max)
-                end,
-                Multi)
+        [Single] -> % is single value
+            parse_value(Single, Min, Max);
+        [_|_] = Multi -> % is list of values
+            {?CRON_LIST, [parse_value(E, Min, Max) || E <- Multi]}
     end.
-     
 
-%% parse the range string: "*/2", "2-5/2", "2-5"
+%% parse a value string: "*", "15", "*/2", "2-5/2", "2-5"
+%%
+%% "*"
+parse_value("*", _Min, _Max) ->
+    {?CRON_ANY};
+%%
+%% "15", "*/2", "2-5/2", "2-5"
+parse_value(Str, Min, Max) when is_list(Str) ->
+    case (string:chr(Str, $-) > 0) orelse (string:chr(Str, $/) > 0) of
+        true ->
+            parse_range(Str, Min, Max);
+        false ->
+            parse_num(Str, Min, Max)
+    end.
+
+%% parse a num string: "15"
+parse_num(Str, Min, Max) ->
+    io:format("parse num: ~p~n", [{Str, Min, Max}]),
+    case list_to_integer(Str) of
+        N when N >= Min, N =< Max ->
+            {?CRON_NUM, N};
+        _ ->
+            error
+    end.
+
+%% parse a range string: "*/2", "2-5/2", "2-5"
 parse_range(Str, Min, Max) ->
-    {RangeStr, Step} = 
+    {RangeStr, Step} =
     case string:tokens(Str, "/") of
         [Range] ->
             {Range, 1};
@@ -123,4 +127,24 @@ parse_range(Str, Min, Max) ->
         _ ->
             [list_to_integer(S) || S <- string:tokens(RangeStr, "-")]
     end,
-    {First, Last, Step}.
+    case {First, Last, Step} of
+        {First, Last, Step} = RangeSpec when First >= Min, Last =< Max, Step >= Min, Step =< Max ->
+            {?CRON_RANGE, RangeSpec};
+        _ ->
+            error
+    end.
+
+%% convert the intermediate format into records
+raw_to_record(Raw, Min, Max, Error) ->
+    case Raw of
+        {?CRON_ANY} ->
+            #cron_field{type = ?CRON_RANGE, value = {Min, Max, 1}};
+        {?CRON_NUM, N} ->
+            #cron_field{type = ?CRON_NUM, value = N};
+        {?CRON_RANGE, {_First, _Last, _Step} = Range} ->
+            #cron_field{type = ?CRON_RANGE, value = Range};
+        {?CRON_LIST, List} ->
+            #cron_field{type = ?CRON_LIST, value = [raw_to_record(I, Min, Max, Error) || I <- List]};
+        _ ->
+            throw(Error)
+    end.
